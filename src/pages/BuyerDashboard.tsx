@@ -1,28 +1,29 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Plus, CheckCircle2, Circle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/lib/store';
-import type { Requirement } from '@/lib/types';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function BuyerDashboard() {
-  const { requirements, addRequirement, currentUser } = useAppStore();
+  const { requirements, addRequirement, loadRequirements } = useAppStore();
+  const { profile } = useAuth();
   const navigate = useNavigate();
   const [itemName, setItemName] = useState('');
   const [qtyNeeded, setQtyNeeded] = useState('');
 
-  const myReqs = requirements.filter(r => r.buyer_id === currentUser?.id);
+  useEffect(() => { loadRequirements(); }, []);
 
-  const handleAdd = () => {
-    if (!itemName || !qtyNeeded || !currentUser) return;
-    const req: Requirement = {
-      id: `r-${Date.now()}`,
-      buyer_id: currentUser.id,
+  const myReqs = requirements.filter(r => r.buyer_id === profile?.id);
+
+  const handleAdd = async () => {
+    if (!itemName || !qtyNeeded || !profile) return;
+    await addRequirement({
+      buyer_id: profile.id,
       item_name: itemName,
       qty_needed: Number(qtyNeeded),
       status: 'open',
-    };
-    addRequirement(req);
+    });
     setItemName('');
     setQtyNeeded('');
   };
@@ -31,10 +32,9 @@ export default function BuyerDashboard() {
     <div className="p-4 max-w-lg mx-auto">
       <div className="mb-6">
         <h1 className="text-kiosk">Requirements</h1>
-        <p className="text-muted-foreground font-medium">{currentUser?.business_name}</p>
+        <p className="text-muted-foreground font-medium">{profile?.business_name}</p>
       </div>
 
-      {/* Add Requirement */}
       <div className="card-surface mb-6 space-y-3">
         <p className="text-kiosk-sm">Post Requirement</p>
         <input
@@ -62,7 +62,6 @@ export default function BuyerDashboard() {
         </motion.button>
       </div>
 
-      {/* Requirements List */}
       <div className="space-y-3 mb-6">
         {myReqs.length === 0 && (
           <div className="card-surface text-center py-8">
@@ -92,7 +91,6 @@ export default function BuyerDashboard() {
         ))}
       </div>
 
-      {/* Find Match */}
       {myReqs.some(r => r.status === 'open') && (
         <motion.button
           whileTap={{ scale: 0.95 }}

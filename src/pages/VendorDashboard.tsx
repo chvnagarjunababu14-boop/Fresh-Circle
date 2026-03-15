@@ -1,9 +1,9 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, AlertTriangle, Package, Mic } from 'lucide-react';
+import { Plus, AlertTriangle, Package } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
+import { useAuth } from '@/hooks/useAuth';
 import VoiceInput from '@/components/VoiceInput';
-import type { Product } from '@/lib/types';
 
 const produceItems = [
   { name: 'Tomato', emoji: '🍅' },
@@ -15,36 +15,35 @@ const produceItems = [
 ];
 
 export default function VendorDashboard() {
-  const { products, addProduct, toggleSurplus, currentUser } = useAppStore();
+  const { products, addProduct, toggleSurplus, loadProducts } = useAppStore();
+  const { profile } = useAuth();
   const [showAdd, setShowAdd] = useState(false);
   const [selectedItem, setSelectedItem] = useState<typeof produceItems[0] | null>(null);
   const [qty, setQty] = useState('');
   const [price, setPrice] = useState('');
   const [surplusMode, setSurplusMode] = useState(false);
 
-  const myProducts = products.filter(p => p.vendor_id === currentUser?.id);
+  useEffect(() => { loadProducts(); }, []);
 
-  const handleAdd = useCallback(() => {
-    if (!selectedItem || !qty || !price || !currentUser) return;
-    const newProduct: Product = {
-      id: `p-${Date.now()}`,
-      vendor_id: currentUser.id,
+  const myProducts = products.filter(p => p.vendor_id === profile?.id);
+
+  const handleAdd = useCallback(async () => {
+    if (!selectedItem || !qty || !price || !profile) return;
+    await addProduct({
+      vendor_id: profile.id,
       name: selectedItem.name,
       emoji: selectedItem.emoji,
       qty_kg: Number(qty),
       price_per_kg: Number(price),
       is_surplus: false,
-      created_at: new Date().toISOString(),
-    };
-    addProduct(newProduct);
+    });
     setSelectedItem(null);
     setQty('');
     setPrice('');
     setShowAdd(false);
-  }, [selectedItem, qty, price, currentUser, addProduct]);
+  }, [selectedItem, qty, price, profile, addProduct]);
 
   const handleVoice = (text: string) => {
-    // Parse "50 kg tomato at 40"
     const match = text.match(/(\d+)\s*(?:kg|kilo)?\s*(\w+)(?:\s*(?:at|@)\s*(\d+))?/i);
     if (match) {
       setQty(match[1]);
@@ -58,16 +57,14 @@ export default function VendorDashboard() {
 
   return (
     <div className="p-4 max-w-lg mx-auto">
-      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-kiosk">My Stock</h1>
-          <p className="text-muted-foreground font-medium">{currentUser?.business_name}</p>
+          <p className="text-muted-foreground font-medium">{profile?.business_name}</p>
         </div>
         <VoiceInput onResult={handleVoice} />
       </div>
 
-      {/* Surplus Toggle */}
       <motion.button
         whileTap={{ scale: 0.97 }}
         onClick={() => setSurplusMode(!surplusMode)}
@@ -82,7 +79,6 @@ export default function VendorDashboard() {
         </div>
       </motion.button>
 
-      {/* Product List */}
       <div className="space-y-3 mb-6">
         {myProducts.map((p) => (
           <motion.div
@@ -94,7 +90,7 @@ export default function VendorDashboard() {
             <div className="flex-1">
               <div className="text-kiosk-sm">{p.name}</div>
               <div className="text-muted-foreground text-sm font-medium">
-                {p.qty_kg} kg · ₹{p.price_per_kg.toFixed(0)}/kg
+                {p.qty_kg} kg · ₹{Number(p.price_per_kg).toFixed(0)}/kg
               </div>
             </div>
             {p.is_surplus && (
@@ -115,7 +111,6 @@ export default function VendorDashboard() {
         ))}
       </div>
 
-      {/* Add Stock Button */}
       <motion.button
         whileTap={{ scale: 0.95 }}
         onClick={() => setShowAdd(true)}
@@ -125,7 +120,6 @@ export default function VendorDashboard() {
         <span className="text-xl">Add Stock</span>
       </motion.button>
 
-      {/* Add Stock Sheet */}
       <AnimatePresence>
         {showAdd && (
           <motion.div
@@ -143,7 +137,6 @@ export default function VendorDashboard() {
                 </motion.button>
               </div>
 
-              {/* Item Grid */}
               <div className="grid grid-cols-3 gap-3 mb-6">
                 {produceItems.map((item) => (
                   <motion.button
@@ -160,7 +153,6 @@ export default function VendorDashboard() {
                 ))}
               </div>
 
-              {/* Inputs */}
               <div className="space-y-4 mb-6">
                 <div>
                   <label className="text-sm font-bold text-muted-foreground mb-2 block">Quantity (kg)</label>

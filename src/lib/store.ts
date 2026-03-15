@@ -1,65 +1,96 @@
 import { create } from 'zustand';
-import type { UserRole, Profile, Product, Requirement, StorageRequest } from './types';
+import { supabase } from '@/integrations/supabase/client';
+import type { Tables } from '@/integrations/supabase/types';
+
+type Profile = Tables<'profiles'>;
+type Product = Tables<'products'>;
+type Requirement = Tables<'requirements'>;
+type StorageRequest = Tables<'storage_requests'>;
 
 interface AppStore {
-  // Auth state (mock)
-  currentUser: Profile | null;
-  setCurrentUser: (user: Profile | null) => void;
-  
   // Products
   products: Product[];
-  addProduct: (p: Product) => void;
-  toggleSurplus: (id: string) => void;
-  
+  loadProducts: () => Promise<void>;
+  addProduct: (p: Omit<Product, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  toggleSurplus: (id: string) => Promise<void>;
+
   // Requirements
   requirements: Requirement[];
-  addRequirement: (r: Requirement) => void;
-  fulfillRequirement: (id: string) => void;
-  
+  loadRequirements: () => Promise<void>;
+  addRequirement: (r: Omit<Requirement, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  fulfillRequirement: (id: string) => Promise<void>;
+
   // Storage
   storageRequests: StorageRequest[];
-  addStorageRequest: (s: StorageRequest) => void;
-  
-  // All vendors (mock)
+  loadStorageRequests: () => Promise<void>;
+  addStorageRequest: (s: Omit<StorageRequest, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
+
+  // All vendors
   vendors: Profile[];
-  setVendors: (v: Profile[]) => void;
+  loadVendors: () => Promise<void>;
 }
 
-// Generate mock vendors
-const mockVendors: Profile[] = [
-  { id: 'v1', email: 'ravi@farm.in', role: 'vendor', business_name: 'Ravi Fresh Farm', lat: 12.9716, lng: 77.5946 },
-  { id: 'v2', email: 'anita@greens.in', role: 'vendor', business_name: 'Anita Greens', lat: 12.9616, lng: 77.5846 },
-  { id: 'v3', email: 'kumar@veggies.in', role: 'vendor', business_name: 'Kumar Veggies', lat: 12.9816, lng: 77.6046 },
-];
+export const useAppStore = create<AppStore>((set, get) => ({
+  products: [],
+  loadProducts: async () => {
+    const { data } = await supabase.from('products').select('*');
+    if (data) set({ products: data });
+  },
+  addProduct: async (p) => {
+    const { data, error } = await supabase.from('products').insert(p).select().single();
+    if (data) set((s) => ({ products: [...s.products, data] }));
+  },
+  toggleSurplus: async (id) => {
+    const product = get().products.find((p) => p.id === id);
+    if (!product) return;
+    const newSurplus = !product.is_surplus;
+    const newPrice = newSurplus ? product.price_per_kg * 0.7 : product.price_per_kg / 0.7;
+    const { error } = await supabase
+      .from('products')
+      .update({ is_surplus: newSurplus, price_per_kg: newPrice })
+      .eq('id', id);
+    if (!error) {
+      set((s) => ({
+        products: s.products.map((p) =>
+          p.id === id ? { ...p, is_surplus: newSurplus, price_per_kg: newPrice } : p
+        ),
+      }));
+    }
+  },
 
-const mockProducts: Product[] = [
-  { id: 'p1', vendor_id: 'v1', name: 'Tomato', emoji: '🍅', qty_kg: 50, price_per_kg: 40, is_surplus: false, created_at: new Date().toISOString() },
-  { id: 'p2', vendor_id: 'v1', name: 'Potato', emoji: '🥔', qty_kg: 80, price_per_kg: 30, is_surplus: false, created_at: new Date().toISOString() },
-  { id: 'p3', vendor_id: 'v2', name: 'Tomato', emoji: '🍅', qty_kg: 30, price_per_kg: 35, is_surplus: true, created_at: new Date().toISOString() },
-  { id: 'p4', vendor_id: 'v2', name: 'Onion', emoji: '🧅', qty_kg: 60, price_per_kg: 25, is_surplus: false, created_at: new Date().toISOString() },
-  { id: 'p5', vendor_id: 'v3', name: 'Potato', emoji: '🥔', qty_kg: 100, price_per_kg: 28, is_surplus: false, created_at: new Date().toISOString() },
-  { id: 'p6', vendor_id: 'v3', name: 'Onion', emoji: '🧅', qty_kg: 45, price_per_kg: 22, is_surplus: true, created_at: new Date().toISOString() },
-];
-
-export const useAppStore = create<AppStore>((set) => ({
-  currentUser: null,
-  setCurrentUser: (user) => set({ currentUser: user }),
-  
-  products: mockProducts,
-  addProduct: (p) => set((s) => ({ products: [...s.products, p] })),
-  toggleSurplus: (id) => set((s) => ({
-    products: s.products.map(p => p.id === id ? { ...p, is_surplus: !p.is_surplus, price_per_kg: !p.is_surplus ? p.price_per_kg * 0.7 : p.price_per_kg / 0.7 } : p)
-  })),
-  
   requirements: [],
-  addRequirement: (r) => set((s) => ({ requirements: [...s.requirements, r] })),
-  fulfillRequirement: (id) => set((s) => ({
-    requirements: s.requirements.map(r => r.id === id ? { ...r, status: 'fulfilled' as const } : r)
-  })),
-  
+  loadRequirements: async () => {
+    const { data } = await supabase.from('requirements').select('*');
+    if (data) set({ requirements: data });
+  },
+  addRequirement: async (r) => {
+    const { data } = await supabase.from('requirements').insert(r).select().single();
+    if (data) set((s) => ({ requirements: [...s.requirements, data] }));
+  },
+  fulfillRequirement: async (id) => {
+    const { error } = await supabase.from('requirements').update({ status: 'fulfilled' }).eq('id', id);
+    if (!error) {
+      set((s) => ({
+        requirements: s.requirements.map((r) =>
+          r.id === id ? { ...r, status: 'fulfilled' } : r
+        ),
+      }));
+    }
+  },
+
   storageRequests: [],
-  addStorageRequest: (s) => set((st) => ({ storageRequests: [...st.storageRequests, s] })),
-  
-  vendors: mockVendors,
-  setVendors: (v) => set({ vendors: v }),
+  loadStorageRequests: async () => {
+    const { data } = await supabase.from('storage_requests').select('*');
+    if (data) set({ storageRequests: data });
+  },
+  addStorageRequest: async (s) => {
+    const { data } = await supabase.from('storage_requests').insert(s).select().single();
+    if (data) set((st) => ({ storageRequests: [...st.storageRequests, data] }));
+  },
+
+  vendors: [],
+  loadVendors: async () => {
+    const { data } = await supabase.from('profiles').select('*').eq('role', 'vendor');
+    if (data) set({ vendors: data });
+  },
 }));

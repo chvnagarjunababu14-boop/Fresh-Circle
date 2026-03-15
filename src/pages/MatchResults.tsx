@@ -1,20 +1,28 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { MapPin, Tag, ArrowLeft, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/lib/store';
+import { useAuth } from '@/hooks/useAuth';
 import { smartMatchAlgorithm } from '@/lib/smartMatch';
 
 export default function MatchResults() {
   const navigate = useNavigate();
-  const { requirements, vendors, products, currentUser } = useAppStore();
+  const { requirements, vendors, products, loadProducts, loadRequirements, loadVendors } = useAppStore();
+  const { profile } = useAuth();
+
+  useEffect(() => {
+    loadProducts();
+    loadRequirements();
+    loadVendors();
+  }, []);
 
   const results = useMemo(() => {
-    if (!currentUser) return [];
-    const buyerLat = currentUser.lat ?? 12.9716;
-    const buyerLng = currentUser.lng ?? 77.5946;
+    if (!profile) return [];
+    const buyerLat = profile.lat ?? 12.9716;
+    const buyerLng = profile.lng ?? 77.5946;
     return smartMatchAlgorithm(requirements, vendors, products, buyerLat, buyerLng);
-  }, [requirements, vendors, products, currentUser]);
+  }, [requirements, vendors, products, profile]);
 
   return (
     <div className="p-4 max-w-lg mx-auto">
@@ -54,7 +62,7 @@ export default function MatchResults() {
                 </span>
               ) : (
                 <span className="text-xs font-bold bg-surplus/10 text-surplus px-3 py-1 rounded-full">
-                  {result.totalQty.toFixed(0)} / {results.length > 0 ? 'needed' : '0'} kg
+                  {result.totalQty.toFixed(0)} kg found
                 </span>
               )}
             </div>

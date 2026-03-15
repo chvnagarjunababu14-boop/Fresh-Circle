@@ -1,31 +1,11 @@
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Store, UtensilsCrossed, Truck, Warehouse, Leaf } from 'lucide-react';
-import type { UserRole } from '@/lib/types';
-import { useAppStore } from '@/lib/store';
-
-const roles: { role: UserRole; label: string; icon: typeof Store; desc: string }[] = [
-  { role: 'vendor', label: 'Vendor', icon: Store, desc: 'Sell fresh produce' },
-  { role: 'buyer', label: 'Buyer', icon: UtensilsCrossed, desc: 'Restaurant / Hotel' },
-  { role: 'logistics', label: 'Logistics', icon: Truck, desc: 'Deliver goods' },
-  { role: 'storage', label: 'Cold Storage', icon: Warehouse, desc: 'Store surplus' },
-];
+import { useAuth } from '@/hooks/useAuth';
 
 export default function LandingPage() {
   const navigate = useNavigate();
-  const setCurrentUser = useAppStore((s) => s.setCurrentUser);
-
-  const selectRole = (role: UserRole) => {
-    setCurrentUser({
-      id: `user-${role}`,
-      email: `${role}@demo.app`,
-      role,
-      business_name: `Demo ${role}`,
-      lat: 12.9716,
-      lng: 77.5946,
-    });
-    navigate(role === 'vendor' ? '/vendor/dashboard' : '/buyer/dashboard');
-  };
+  const { profile } = useAuth();
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
@@ -46,27 +26,38 @@ export default function LandingPage() {
         <p className="text-lg font-medium text-muted-foreground mt-2">
           Hyperlocal Produce · Zero Waste
         </p>
+        {profile && (
+          <p className="text-sm text-muted-foreground mt-1">
+            Logged in as <span className="font-bold text-primary">{profile.role}</span>
+          </p>
+        )}
       </motion.div>
 
       <div className="w-full max-w-sm space-y-4">
-        <p className="text-kiosk-sm text-center">I am a...</p>
-        {roles.map(({ role, label, icon: Icon, desc }, i) => (
-          <motion.button
-            key={role}
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: i * 0.08, duration: 0.2 }}
-            whileTap={{ scale: 0.97 }}
-            onClick={() => selectRole(role)}
-            className="btn-fresh w-full justify-start"
-          >
-            <Icon size={32} />
+        {profile?.role === 'vendor' && (
+          <motion.button whileTap={{ scale: 0.97 }} onClick={() => navigate('/vendor/dashboard')} className="btn-fresh w-full justify-start">
+            <Store size={32} />
             <div className="text-left">
-              <div className="text-xl font-bold">{label}</div>
-              <div className="text-sm opacity-80 font-medium">{desc}</div>
+              <div className="text-xl font-bold">Vendor Dashboard</div>
+              <div className="text-sm opacity-80 font-medium">Manage your stock</div>
             </div>
           </motion.button>
-        ))}
+        )}
+        {profile?.role === 'buyer' && (
+          <motion.button whileTap={{ scale: 0.97 }} onClick={() => navigate('/buyer/dashboard')} className="btn-fresh w-full justify-start">
+            <UtensilsCrossed size={32} />
+            <div className="text-left">
+              <div className="text-xl font-bold">Buyer Dashboard</div>
+              <div className="text-sm opacity-80 font-medium">Post requirements</div>
+            </div>
+          </motion.button>
+        )}
+        <motion.button whileTap={{ scale: 0.97 }} onClick={() => navigate('/profile')} className="card-surface flex items-center gap-3 min-h-[64px] px-4 w-full cursor-pointer">
+          <div className="text-left">
+            <div className="text-lg font-bold text-foreground">My Profile</div>
+            <div className="text-sm text-muted-foreground font-medium">Update location & info</div>
+          </div>
+        </motion.button>
       </div>
     </div>
   );
