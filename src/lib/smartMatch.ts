@@ -1,5 +1,23 @@
 import { getDistance, MAX_RADIUS_KM } from './distance';
-import type { Product, Profile, Requirement, MatchResult, VendorMatch } from './types';
+import type { Tables } from '@/integrations/supabase/types';
+
+type Product = Tables<'products'>;
+type Profile = Tables<'profiles'>;
+type Requirement = Tables<'requirements'>;
+
+export interface VendorMatch {
+  vendor: Profile;
+  product: Product;
+  distance: number;
+  effectivePrice: number;
+}
+
+export interface MatchResult {
+  item_name: string;
+  matches: VendorMatch[];
+  totalQty: number;
+  fulfilled: boolean;
+}
 
 export function smartMatchAlgorithm(
   requirements: Requirement[],
@@ -21,18 +39,17 @@ export function smartMatchAlgorithm(
           if (!vendor || vendor.lat == null || vendor.lng == null) return null;
           const distance = getDistance(buyerLat, buyerLng, vendor.lat, vendor.lng);
           if (distance > MAX_RADIUS_KM) return null;
-          const effectivePrice = p.is_surplus ? p.price_per_kg * 0.7 : p.price_per_kg;
+          const effectivePrice = p.is_surplus ? Number(p.price_per_kg) * 0.7 : Number(p.price_per_kg);
           return { vendor, product: p, distance, effectivePrice } as VendorMatch;
         })
         .filter(Boolean) as VendorMatch[];
 
-      // Sort by price then distance
       relevantProducts.sort((a, b) => a.effectivePrice - b.effectivePrice || a.distance - b.distance);
 
       for (const match of relevantProducts) {
         if (totalQty >= req.qty_needed) break;
         matches.push(match);
-        totalQty += match.product.qty_kg;
+        totalQty += Number(match.product.qty_kg);
       }
 
       return {
